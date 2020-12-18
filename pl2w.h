@@ -180,7 +180,7 @@ typedef struct
    && (cmd)->pfnRouterProc == 0 \
    && (cmd)->pfnHandlerProc == 0)
 
-typedef struct
+typedef struct stLanguage
 {
   LPCSTR szLangName;
   LPCSTR szLangInfo;
@@ -196,7 +196,7 @@ typedef struct
 
 typedef LPLANGUAGE (*LPLOADPROC)(SEMVER version,
                                  LPERROR pError);
-typedef LPCSTR* (*LPLOADPROC)(void);
+typedef LPCSTR* (*LPEASYLOADPROC)(void);
 
 /*** ----------------------------- Run ----------------------------- ***/
 

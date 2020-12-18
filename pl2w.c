@@ -962,7 +962,7 @@ static BOOL LoadLanguage(LPRUNCONTEXT pContext,
                          LPCOMMAND pCmd,
                          LPERROR pError);
 static LPLANGUAGE EasyLoad(HMODULE hModule,
-                           LPCSTR *cmdNames,
+                           LPCSTR *aCmdNames,
                            LPERROR pError);
 
 void RunProgram(LPPROGRAM pProgram, LPERROR pError)
@@ -986,7 +986,8 @@ void RunProgram(LPPROGRAM pProgram, LPERROR pError)
   DestroyRunContext(pContext);
 }
 
-static LPRUNCONTEXT CreateRunContext(LPPROGRAM pProgram) {
+static LPRUNCONTEXT CreateRunContext(LPPROGRAM pProgram)
+{
   LPRUNCONTEXT pRet = (LPRUNCONTEXT)malloc(sizeof(struct stRunContext));
   if (pRet == NULL)
     {
@@ -1001,108 +1002,137 @@ static LPRUNCONTEXT CreateRunContext(LPPROGRAM pProgram) {
   return pRet;
 }
 
-static void DestroyRunContext(LPRUNCONTEXT pCtx) {
-  if (pCtx->hModule != NULL) {
-    if (pCtx->pLanguage != NULL) {
-      if (pCtx->pLanguage->pfnAtexitProc != NULL) {
-        pCtx->pLanguage->pfnAtexitProc(pCtx->pUserContext);
+static void DestroyRunContext(LPRUNCONTEXT pCtx)
+{
+  if (pCtx->hModule != NULL) 
+    {
+      if (pCtx->pLanguage != NULL)
+        {
+          if (pCtx->pLanguage->pfnAtexitProc != NULL)
+            {
+              pCtx->pLanguage->pfnAtexitProc(pCtx->pUserContext);
+            }
+          if (pCtx->bOwnLanguage)
+            {
+              free(pCtx->pLanguage->aSinvokeHandlers);
+              free(pCtx->pLanguage->aWCallHandlers);
+              free(pCtx->pLanguage);
+            }
+          pCtx->pLanguage = NULL;
+        }
+      if (FreeLibrary(pCtx->hModule) == 0)
+        {
+        fprintf(stderr, "[int/e] error invoking FreeLibrary: %ld\n",
+                GetLastError());
       }
-      if (pCtx->bOwnLanguage) {
-        free(pCtx->pLanguage->aSinvokeHandlers);
-        free(pCtx->pLanguage->aWCallHandlers);
-        free(pCtx->pLanguage);
-      }
-      pCtx->pLanguage = NULL;
     }
-    if (FreeLibrary(pCtx->hModule) == 0) {
-      fprintf(stderr, "[int/e] error invoking FreeLibrary: %ld\n",
-              GetLastError());
-    }
-  }
   free(pCtx);
 }
 
 static BOOL HandleCommand(LPRUNCONTEXT pCtx,
                           LPCOMMAND pCmd,
-                          LPERROR pError) {
-  if (pCmd == NULL) {
-    return FALSE;
-  }
+                          LPERROR pError)
+{
+  if (pCmd == NULL)
+    {
+      return FALSE;
+    }
 
-  if (!strcmp(pCmd->szCmd, "language")) {
-    return LoadLanguage(pCtx, pCmd, pError);
-  } else if (!strcmp(pCmd->szCmd, "abort")) {
-    return FALSE;
-  }
+  if (!strcmp(pCmd->szCmd, "language"))
+    {
+      return LoadLanguage(pCtx, pCmd, pError);
+    }
+  else if (!strcmp(pCmd->szCmd, "abort"))
+    {
+      return FALSE;
+    }
 
-  if (pCtx->pLanguage == NULL) {
-    ErrPrintf(pError, PL2ERR_NO_LANG, pCmd->srcInfo, NULL,
-              "no language loaded to execute user command");
-    return FALSE;
-  }
+  if (pCtx->pLanguage == NULL)
+    {
+      ErrPrintf(pError, PL2ERR_NO_LANG, pCmd->srcInfo, NULL,
+                "no language loaded to execute user command");
+      return FALSE;
+    }
 
   for (SINVHANDLER *iter = pCtx->pLanguage->aSinvokeHandlers;
        iter != NULL && !IS_EMPTY_SINVOKE_CMD(iter);
-       ++iter) {
-    if (!iter->bRemoved && !strcmp(pCmd->szCmd, iter->szCmdName)) {
-      if (iter->bDeprecated) {
-        fprintf(stderr, "[int/w] using deprecated command: %s\n",
-                iter->szCmdName);
-      }
-      if (iter->pfnHandlerProc != NULL) {
-        iter->pfnHandlerProc((LPCSTR*)pCmd->aArgs);
-      }
-      pCtx->pCurCmd = pCmd->pNext;
-      return TRUE;
-    }
-  }
-
-  for (WCALLHANDLER *iter = pCtx->pLanguage->aWCallHandlers;
-       iter != NULL && !IS_EMPTY_CMD(iter);
-       ++iter) {
-    if (!iter->bRemoved && !strcmp(pCmd->szCmd, iter->szCmdName)) {
-      if (iter->szCmdName != NULL
-          && strcmp(pCmd->szCmd, iter->szCmdName) != 0) {
-        // Do nothing if so
-      } else if (iter->pfnRouterProc != NULL
-                 && !iter->pfnRouterProc(pCmd->szCmd)) {
-        // Do nothing if so
-      } else {
-        if (iter->bDeprecated) {
-          fprintf(stderr, "[int/w] using deprecated command: %s\n",
-                  iter->szCmdName);
-        }
-        if (iter->pfnHandlerProc == NULL) {
+       ++iter)
+    {
+      if (!iter->bRemoved && !strcmp(pCmd->szCmd, iter->szCmdName))
+        {
+          if (iter->bDeprecated)
+            {
+              fprintf(stderr, "[int/w] using deprecated command: %s\n",
+                      iter->szCmdName);
+            }
+          if (iter->pfnHandlerProc != NULL)
+            {
+              iter->pfnHandlerProc((LPCSTR*)pCmd->aArgs);
+            }
           pCtx->pCurCmd = pCmd->pNext;
           return TRUE;
         }
-
-        LPCOMMAND pNextCmd = iter->pfnHandlerProc
-          (
-            pCtx->pProgram,
-            pCtx->pUserContext,
-            pCmd,
-            pError
-          );
-        if (IsError(pError)) {
-          return 0;
-        }
-        if (pNextCmd == pCtx->pLanguage->pTermCmd) {
-          return 0;
-        }
-        pCtx->pCurCmd = pNextCmd ? pNextCmd : pCmd->pNext;
-        return 1;
-      }
     }
-  }
 
-  if (pCtx->pLanguage->pfnFallbackProc == NULL) {
-    ErrPrintf(pError, PL2ERR_UNKNOWN_CMD, pCmd->srcInfo, NULL,
-                   "`%s` is not recognized as an internal or external "
-                   "command, operable pProgram or batch file",
-                   pCmd->szCmd);
-    return 0;
-  }
+  for (WCALLHANDLER *iter = pCtx->pLanguage->aWCallHandlers;
+       iter != NULL && !IS_EMPTY_CMD(iter);
+       ++iter)
+    {
+      if (!iter->bRemoved && !strcmp(pCmd->szCmd, iter->szCmdName))
+        {
+          if (iter->szCmdName != NULL
+              && strcmp(pCmd->szCmd, iter->szCmdName) != 0)
+            {
+              // Do nothing if so
+            }
+          else if (iter->pfnRouterProc != NULL
+                   && !iter->pfnRouterProc(pCmd->szCmd))
+            {
+              // Do nothing if so
+            }
+          else
+            {
+              if (iter->bDeprecated)
+                {
+                  fprintf(stderr,
+                          "[int/w] using deprecated command: %s\n",
+                          iter->szCmdName);
+                }
+              if (iter->pfnHandlerProc == NULL)
+                {
+                  pCtx->pCurCmd = pCmd->pNext;
+                  return TRUE;
+                }
+
+              LPCOMMAND pNextCmd = iter->pfnHandlerProc
+                (
+                  pCtx->pProgram,
+                  pCtx->pUserContext,
+                  pCmd,
+                  pError
+                );
+              if (IsError(pError))
+                {
+                  return 0;
+                }
+              if (pNextCmd == pCtx->pLanguage->pTermCmd)
+                {
+                  return 0;
+                }
+              pCtx->pCurCmd = pNextCmd ? pNextCmd : pCmd->pNext;
+              return 1;
+            }
+        }
+    }
+
+  if (pCtx->pLanguage->pfnFallbackProc == NULL)
+    {
+      ErrPrintf(pError, PL2ERR_UNKNOWN_CMD, pCmd->srcInfo, NULL,
+                "`%s` is not recognized as an internal or external "
+                "command, operable pProgram or batch file",
+                pCmd->szCmd);
+      return 0;
+    }
 
   LPCOMMAND pNextCmd = pCtx->pLanguage->pfnFallbackProc
     (
@@ -1121,12 +1151,14 @@ static BOOL HandleCommand(LPRUNCONTEXT pCtx,
       return 0;
     }
 
-  if (IsError(pError)) {
-    return 0;
-  }
-  if (pNextCmd == pCtx->pLanguage->pTermCmd) {
-    return 0;
-  }
+  if (IsError(pError))
+    {
+      return 0;
+    }
+  if (pNextCmd == pCtx->pLanguage->pTermCmd)
+    {
+      return 0;
+    }
 
   pCtx->pCurCmd = pNextCmd ? pNextCmd : pCmd->pNext;
   return 1;
@@ -1136,11 +1168,11 @@ static BOOL LoadLanguage(LPRUNCONTEXT pCtx,
                          LPCOMMAND pCmd,
                          LPERROR pError)
 {
-  if (pCtx->language != NULL)
+  if (pCtx->pLanguage != NULL)
     {
       ErrPrintf(pError, PL2ERR_LOAD_LANG, pCmd->srcInfo, NULL,
                 "language: another language already loaded");
-      return 0;
+      return FALSE;
     }
 
   WORD wArgCount = CountCommandArgs(pCmd);
@@ -1149,19 +1181,19 @@ static BOOL LoadLanguage(LPRUNCONTEXT pCtx,
       ErrPrintf(pError, PL2ERR_LOAD_LANG, pCmd->srcInfo, NULL,
                 "language: expected 2 argument, got %u",
                 wArgCount);
-      return 0;
+      return FALSE;
     }
 
   LPCSTR szLangId = pCmd->aArgs[0];
   SEMVER langVer = ParseSemVer(pCmd->aArgs[1], pError);
   if (IsError(pError)) 
     {
-      return 0;
+      return FALSE;
     }
 
   static CHAR s_szBuffer[4096];
   strcpy(s_szBuffer, "./lib");
-  strcat(s_szBuffer, langId);
+  strcat(s_szBuffer, szLangId);
   strcat(s_szBuffer, ".dll");
   pCtx->hModule = LoadLibraryA(s_szBuffer);
 
@@ -1170,131 +1202,147 @@ static BOOL LoadLanguage(LPRUNCONTEXT pCtx,
       ErrPrintf(pError, PL2ERR_LOAD_LANG, pCmd->srcInfo, NULL,
                 "language: cannot load language library `%s`: %ld",
                 szLangId, GetLastError());
-      return 0;
+      return FALSE;
     }
 
-  FARPROC pfnLoadProc = GetProcAddress
+  LPLOADPROC pfnLoadProc = (LPLOADPROC)GetProcAddress
     (
       pCtx->hModule,
       "LoadLanguageExtension"
     );
-  if (pfnLoadProc == NULL) {
-    FARPROC pfnEasyLoadProc = GetProcAddress
-      (
-        pCtx->hModule,
-        "EasyLoadLanguageExtension"
-      );
+  if (pfnLoadProc == NULL)
+    {
+      LPEASYLOADPROC pfnEasyLoadProc = (LPEASYLOADPROC)GetProcAddress
+        (
+          pCtx->hModule,
+          "EasyLoadLanguageExtension"
+        );
 
-    if (ezLoadPtr == NULL) {
-      ErrPrintf(pError, PL2ERR_LOAD_LANG, pCmd->srcInfo, NULL,
-                     "language: cannot locate `%s` or `%s` "
-                     "on library `%s`: %ld",
-                     "pl2ext_loadLanguage", "pl2ezload", langId,
-                     GetLastError());
-      return 0;
+      if (pfnEasyLoadProc == NULL)
+        {
+          ErrPrintf(pError, PL2ERR_LOAD_LANG, pCmd->srcInfo, NULL,
+                    "language: cannot locate `%s` or `%s` "
+                    "on library `%s`: %ld",
+                    "LoadLanguageExtension",
+                    "EasyLoadLanguageExtension",
+                    szLangId,
+                    GetLastError());
+          return FALSE;
+        }
+
+      pCtx->pLanguage = EasyLoad(pCtx->hModule, pfnEasyLoadProc(), pError);
+      if (IsError(pError))
+        {
+          pError->srcInfo = pCmd->srcInfo;
+          return FALSE;
+        }
+      pCtx->bOwnLanguage = TRUE;
+    }
+  else
+    {
+      pCtx->pLanguage = pfnLoadProc(langVer, pError);
+      if (IsError(pError))
+        {
+          pError->srcInfo = pCmd->srcInfo;
+          return FALSE;
+        }
+      pCtx->bOwnLanguage = FALSE;
     }
 
-    pl2w_EasyLoadLanguage *load = (LPEASYLOADPROC)ezLoadPtr;
-    pCtx->language = ezLoad(pCtx->hModule, load(), pError);
-    if (IsError(pError)) {
-      pError->srcInfo = pCmd->srcInfo;
-      return 0;
+  if (pCtx->pLanguage != NULL && pCtx->pLanguage->pfnInitProc != NULL)
+    {
+      pCtx->pUserContext = pCtx->pLanguage->pfnInitProc(pError);
+      if (IsError(pError))
+        {
+          pError->srcInfo = pCmd->srcInfo;
+          return FALSE;
+        }
     }
-    pCtx->ownLanguage = 1;
-  } else {
-    pl2w_LoadLanguage *load = (pl2w_LoadLanguage*)loadPtr;
-    pCtx->language = load(langVer, pError);
-    if (IsError(pError)) {
-      pError->srcInfo = pCmd->srcInfo;
-      return 0;
-    }
-    pCtx->ownLanguage = 0;
-  }
 
-  if (pCtx->language != NULL && pCtx->language->init != NULL) {
-    pCtx->userContext = pCtx->language->init(pError);
-    if (IsError(pError)) {
-      pError->srcInfo = pCmd->srcInfo;
-      return 0;
-    }
-  }
-
-  pCtx->curCmd = pCmd->next;
-  return 1;
+  pCtx->pCurCmd = pCmd->pNext;
+  return TRUE;
 }
 
-static pl2w_Language *ezLoad(HMODULE hModule,
-                             const LPSTR**cmdNames,
-                             LPERROR pError) {
-  if (cmdNames == NULL || cmdNames[0] == NULL) {
-    return NULL;
-  }
-  WORD count = 0;
-  for (const LPSTR**iter = cmdNames; *iter != NULL; iter++) {
-    ++count;
-  }
-
-  pl2w_Language *ret = (pl2w_Language*)malloc(sizeof(pl2w_Language));
-  if (ret == NULL) {
-    ErrPrintf(error, PL2ERR_MALLOC, SourceInfo(NULL, 0),
-                   NULL,
-                   "language: ezload: "
-                   "cannot allocate memory for pl2w_Language");
-    return NULL;
-  }
-
-  ret->langName = "unknown";
-  ret->langInfo = "anonymous language loaded by ezload";
-  ret->termCmd = NULL;
-  ret->init = NULL;
-  ret->atExit = NULL;
-  ret->pCallCmds = NULL;
-  ret->fallback = NULL;
-  ret->sinvokeCmds = (pl2w_SInvokeCmd*)malloc(
-    sizeof(pl2w_SInvokeCmd) * (count + 1)
-  );
-  if (ret->sinvokeCmds == NULL) {
-    ErrPrintf(error, PL2ERR_MALLOC, SourceInfo(NULL, 0),
-                   NULL,
-                   "langauge: ezload: "
-                   "cannot allocate memory for "
-                   "pl2w_Language->sinvokeCmds");
-    free(ret);
-    return NULL;
-  }
-
-  memset(ret->sinvokeCmds, 0, (count + 1) * sizeof(pl2w_SInvokeCmd));
-  static LPSTRnameBuffer[512];
-  for (WORD i = 0; i < count; i++) {
-    const LPSTR*cmdName = cmdNames[i];
-    if (strlen(cmdName) > 504) {
-      ErrPrintf(error, PL2ERR_LOAD_LANG, SourceInfo(NULL, 0),
-                     NULL,
-                     "language: ezload: "
-                     "name over 500 LPSTRs not supported");
-      free(ret->sinvokeCmds);
-      free(ret);
-      return NULL;
-    }
-    strcpy(nameBuffer, "pl2ez_");
-    strncat(nameBuffer, cmdName, 504);
-    void *ptr = GetProcAddress(hModule, nameBuffer);
-    if (ptr == NULL) {
-      ErrPrintf(error, PL2ERR_LOAD_LANG, SourceInfo(NULL, 0),
-                     NULL,
-                     "language: ezload: cannot load function `%s`: %ld",
-                     nameBuffer, GetLastError());
-      free(ret->sinvokeCmds);
-      free(ret);
+static LPLANGUAGE EasyLoad(HMODULE hModule,
+                           LPCSTR *aCmdNames,
+                           LPERROR pError)
+{
+  if (aCmdNames == NULL || aCmdNames[0] == NULL)
+    {
       return NULL;
     }
 
-    ret->sinvokeCmds[i].cmdName = cmdName;
-    ret->sinvokeCmds[i].stub = (pl2w_SInvokeCmdStub*)ptr;
-    ret->sinvokeCmds[i].deprecated = 0;
-    ret->sinvokeCmds[i].removed = 0;
-  }
+  WORD wCount = 0;
+  for (LPCSTR* iter = aCmdNames; *iter != NULL; iter++)
+    {
+      ++wCount;
+    }
 
-  return ret;
+  LPLANGUAGE pRet = (LPLANGUAGE)malloc(sizeof(struct stLanguage));
+  if (pRet == NULL)
+    {
+      ErrPrintf(pError, PL2ERR_MALLOC, SourceInfo(NULL, 0),
+                NULL,
+                "language: ezload: "
+                "cannot allocate memory for pl2w_Language");
+      return NULL;
+    }
+
+  pRet->szLangName = "unknown";
+  pRet->szLangInfo = "anonymous language loaded by ezload";
+  pRet->pTermCmd = NULL;
+  pRet->pfnInitProc = NULL;
+  pRet->pfnAtexitProc = NULL;
+  pRet->aWCallHandlers = NULL;
+  pRet->pfnFallbackProc = NULL;
+  pRet->aSinvokeHandlers = (SINVHANDLER*)malloc
+    (
+      sizeof(SINVHANDLER) * (wCount + 1)
+    );
+  if (pRet->aSinvokeHandlers == NULL)
+    {
+      ErrPrintf(pError, PL2ERR_MALLOC, SourceInfo(NULL, 0),
+                NULL,
+                "langauge: EasyLoad: "
+                "cannot allocate memory for "
+                "LPLANGUAGE->aSinvokeHandlers");
+      free(pRet);
+      return NULL;
+    }
+
+  memset(pRet->aSinvokeHandlers, 0, (wCount + 1) * sizeof(SINVHANDLER));
+  static CHAR szNameBuffer[512];
+  for (WORD i = 0; i < wCount; i++)
+    {
+      LPCSTR szCmdName = aCmdNames[i];
+      if (strlen(szCmdName) > 504) {
+        ErrPrintf(pError, PL2ERR_LOAD_LANG, SourceInfo(NULL, 0),
+                  NULL,
+                  "language: EasyLoad: "
+                  "name over 504 chars not supported");
+        free(pRet->aSinvokeHandlers);
+        free(pRet);
+        return NULL;
+      }
+      strcpy(szNameBuffer, "EL");
+      strncat(szNameBuffer, szCmdName, 504);
+      void *ptr = GetProcAddress(hModule, szNameBuffer);
+      if (ptr == NULL)
+        {
+          ErrPrintf(pError, PL2ERR_LOAD_LANG, SourceInfo(NULL, 0),
+                    NULL,
+                    "language: ezload: cannot load function `%s`: %ld",
+                    szNameBuffer, GetLastError());
+          free(pRet->aSinvokeHandlers);
+          free(pRet);
+          return NULL;
+        }
+
+      pRet->aSinvokeHandlers[i].szCmdName = szCmdName;
+      pRet->aSinvokeHandlers[i].pfnHandlerProc = (LPSINVPROC)ptr;
+      pRet->aSinvokeHandlers[i].bDeprecated = FALSE;
+      pRet->aSinvokeHandlers[i].bRemoved = FALSE;
+    }
+
+  return pRet;
 }
-
