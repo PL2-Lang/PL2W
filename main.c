@@ -5,13 +5,12 @@
 
 int main(int argc, const char *argv[]) {
   fprintf(stderr, 
-    "PL2 programming language platform\n"
+    "PL2 programming language platform for Windows\n"
     "  Author:  ICEY<icey@icey.tech>\n"
-    "  Edition: %s (%s)\n"
+    "  Edition: %s\n"
     "  Version: v%u.%u.%u %s\n"
     "  License: LDWPL (Limited Derivative Work Public License)\n\n",
     PL2_EDITION,
-    PL2_EDITION_CN,
     PL2W_VER_MAJOR,
     PL2W_VER_MINOR,
     PL2W_VER_PATCH,
@@ -48,7 +47,7 @@ int main(int argc, const char *argv[]) {
   }
 
   pl2w_Error *error = pl2w_errorBuffer(512);
-  pl2w_Program program = pl2w_parse(buffer, 512, error);
+  pl2w_Program lpProgram = pl2w_parse(buffer, 512, error);
   if (pl2w_isError(error)) {
     fprintf(stderr,
             "parsing error %d: line %d: %s\n",
@@ -59,7 +58,7 @@ int main(int argc, const char *argv[]) {
   }
 
   int ret = 0;
-  pl2w_run(&program, error);
+  pl2w_run(&lpProgram, error);
   if (pl2w_isError(error)) {
     fprintf(stderr, 
             "runtime error %d: line %d: %s\n",
@@ -69,7 +68,7 @@ int main(int argc, const char *argv[]) {
     ret = -1;
   }
 
-  pl2w_dropProgram(&program);
+  pl2w_dropProgram(&lpProgram);
   pl2w_dropError(error);
   free(buffer);
   fclose(fp);

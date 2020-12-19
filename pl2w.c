@@ -19,27 +19,27 @@ static BYTE TransmuteU8(CHAR ch)
 /*** ------------------- Implementation of slice ------------------- ***/
 
 typedef struct {
-  PCHAR pStart;
-  PCHAR pEnd;
+  PCHAR pcStart;
+  PCHAR pcEnd;
 } SLICE;
 
 typedef SLICE *LPSLICE;
 typedef const SLICE* LPCSLICE;
 
-static SLICE Slice(PCHAR pStart, PCHAR pEnd);
-static SLICE NullSlice (void);
+static SLICE Slice(PCHAR pcStart, PCHAR pcEnd);
+static SLICE NullSlice(void);
 static LPSTR SliceIntoCStr(SLICE slice);
 static BOOL IsNullSlice(SLICE slice);
 
-SLICE Slice(PCHAR pStart, PCHAR pEnd)
+SLICE Slice(PCHAR pcStart, PCHAR pcEnd)
 {
-  if (pStart == pEnd)
+  if (pcStart == pcEnd)
     {
       return (SLICE){NULL, NULL};
     }
   else
     {
-      return (SLICE){pStart, pEnd};
+      return (SLICE){pcStart, pcEnd};
     }
 }
 
@@ -54,159 +54,160 @@ static LPSTR SliceIntoCStr(SLICE slice)
     {
       return NULL;
     }
-  if (*slice.pEnd != '\0') 
+  if (*slice.pcEnd != '\0') 
     {
-      *slice.pEnd = '\0';
+      *slice.pcEnd = '\0';
     }
-  return slice.pStart;
+  return slice.pcStart;
 }
 
 static BOOL IsNullSlice(SLICE slice)
 {
-  return slice.pStart == slice.pEnd;
+  return slice.pcStart == slice.pcEnd;
 }
 
 /*** ----------------- Implementation of PL2ERR ---------------- ***/
 
-LPERROR ErrorBuffer(WORD wBufferSize)
+LPERROR ErrorBuffer(WORD nBufferSize)
 {
-  LPERROR pRet = (LPERROR)malloc(sizeof(struct stError) + wBufferSize);
-  if (pRet == NULL)
+  LPERROR ret = (LPERROR)malloc(sizeof(struct stError) + nBufferSize);
+  if (ret == NULL)
     {
       return NULL;
     }
-  memset(pRet, 0, sizeof(struct stError) + wBufferSize);
-  pRet->wErrorBufferSize = wBufferSize;
-  return pRet;
+  memset(ret, 0, sizeof(struct stError) + nBufferSize);
+  ret->nErrorBufferSize = nBufferSize;
+  return ret;
 }
 
-void ErrPrintf(LPERROR pError,
-               WORD wErrorCode,
+void ErrPrintf(LPERROR lpError,
+               WORD nLine,
                SRCINFO srcInfo,
-               LPVOID pExtraData,
+               LPVOID lpExtraData,
                LPCSTR szFmt,
                ...)
 {
-  pError->wErrorCode = wErrorCode;
-  pError->pExtraData = pExtraData;
-  pError->srcInfo = srcInfo;
-  if (pError->wErrorBufferSize == 0)
+  lpError->nLine = nLine;
+  lpError->lpExtraData = lpExtraData;
+  lpError->srcInfo = srcInfo;
+  if (lpError->nErrorBufferSize == 0)
     {
       return;
     }
 
   va_list ap;
   va_start(ap, szFmt);
-  vsnprintf(pError->szReason, pError->wErrorBufferSize, szFmt, ap);
+  vsnprintf(lpError->szReason, lpError->nErrorBufferSize, szFmt, ap);
   va_end(ap);
 }
 
-void DropError(LPERROR pError)
+void DropError(LPERROR lpError)
 {
-  if (pError->pExtraData)
+  if (lpError->lpExtraData)
     {
-      free(pError->pExtraData);
+      free(lpError->lpExtraData);
     }
-  free(pError);
+  free(lpError);
 }
 
-BOOL IsError(LPERROR pError)
+BOOL IsError(LPERROR lpError)
 {
-  return pError->wErrorCode != 0;
+  return lpError->nLine != 0;
 }
 
 /*** ------------------- Some toolkit functions -------------------- ***/
 
-SRCINFO SourceInfo(LPCSTR szFileName, WORD wLine)
+SRCINFO SourceInfo(LPCSTR lpszFileName, WORD nLine)
 {
   SRCINFO ret;
-  ret.szFileName = szFileName;
-  ret.wLine = wLine;
+  ret.lpszFileName = lpszFileName;
+  ret.nLine = nLine;
   return ret;
 }
 
-LPCOMMAND CreateCommand(LPCOMMAND pPrev,
-                        LPCOMMAND pNext,
-                        LPVOID pExtraData,
+LPCOMMAND CreateCommand(LPCOMMAND lpPrev,
+                        LPCOMMAND lpNext,
+                        LPVOID lpExtraData,
                         SRCINFO srcInfo,
-                        LPSTR szCmd,
-                        LPSTR aArgs[])
+                        LPSTR lpszCmd,
+                        LPSTR aszArgs[])
 {
-  DWORD wArgCount = 0;
-  for (; aArgs[wArgCount] != NULL; ++wArgCount);
+  DWORD nArgCount = 0;
+  for (; aszArgs[nArgCount] != NULL; ++nArgCount);
 
-  LPCOMMAND pRet = (LPCOMMAND)malloc(
-    sizeof(struct stCommand) + (wArgCount + 1) * sizeof(LPSTR)
-  );
-  if (pRet == NULL)
+  LPCOMMAND ret = (LPCOMMAND)malloc
+    (
+      sizeof(struct stCommand) + (nArgCount + 1) * sizeof(LPSTR)
+    );
+  if (ret == NULL)
     {
       return NULL;
     }
-  pRet->pPrev = pPrev;
-  if (pPrev != NULL)
+  ret->lpPrev = lpPrev;
+  if (lpPrev != NULL)
     {
-      pPrev->pNext = pRet;
+      lpPrev->lpNext = ret;
     }
-  pRet->pNext = pNext;
-  if (pNext != NULL)
+  ret->lpNext = lpNext;
+  if (lpNext != NULL)
     {
-      pNext->pPrev = pRet;
+      lpNext->lpPrev = ret;
     }
-  pRet->srcInfo = srcInfo;
-  pRet->szCmd = szCmd;
-  pRet->pExtraData = pExtraData;
-  for (WORD i = 0; i < wArgCount; i++)
+  ret->srcInfo = srcInfo;
+  ret->lpszCmd = lpszCmd;
+  ret->lpExtraData = lpExtraData;
+  for (WORD i = 0; i < nArgCount; i++)
     {
-      pRet->aArgs[i] = aArgs[i];
+      ret->aszArgs[i] = aszArgs[i];
     }
-  pRet->aArgs[wArgCount] = NULL;
-  return pRet;
+  ret->aszArgs[nArgCount] = NULL;
+  return ret;
 }
 
-WORD CountCommandArgs(LPCOMMAND pCmd)
+WORD CountCommandArgs(LPCOMMAND lpCmd)
 {
-  WORD wAcc = 0;
-  LPSTR *iter = pCmd->aArgs;
+  WORD nAcc = 0;
+  LPSTR *iter = lpCmd->aszArgs;
   while (*iter != NULL)
     {
       iter++;
-      wAcc++;
+      nAcc++;
     }
-  return wAcc;
+  return nAcc;
 }
 
 /*** ---------------- Implementation of pl2w_Program --------------- ***/
 
-void InitProgram(LPPROGRAM pProgram)
+void InitProgram(LPPROGRAM lpProgram)
 {
-  pProgram->pCommands = NULL;
+  lpProgram->lpCommands = NULL;
 }
 
-void DropProgram(LPPROGRAM pProgram)
+void DropProgram(LPPROGRAM lpProgram)
 {
-  LPCOMMAND iter = pProgram->pCommands;
+  LPCOMMAND iter = lpProgram->lpCommands;
   while (iter != NULL)
     {
-      LPCOMMAND pNext = iter->pNext;
+      LPCOMMAND lpNext = iter->lpNext;
       free(iter);
-      iter = pNext;
+      iter = lpNext;
     }
 }
 
-void DebugPrintProgram(LPCPROGRAM pProgram)
+void DebugPrintProgram(LPCPROGRAM lpProgram)
 {
   fprintf(stderr, "program commands\n");
-  LPCOMMAND pCmd = pProgram->pCommands;
-  while (pCmd != NULL)
+  LPCOMMAND lpCmd = lpProgram->lpCommands;
+  while (lpCmd != NULL)
     {
-      fprintf(stderr, "\t%s [", pCmd->szCmd);
-      for (WORD i = 0; pCmd->aArgs[i] != NULL; i++)
+      fprintf(stderr, "\t%s [", lpCmd->lpszCmd);
+      for (WORD i = 0; lpCmd->aszArgs[i] != NULL; i++)
         {
-          LPSTR szArg = pCmd->aArgs[i];
-          fprintf(stderr, "`%s`, ", szArg);
+          LPSTR lpszArg = lpCmd->aszArgs[i];
+          fprintf(stderr, "`%s`, ", lpszArg);
         }
       fprintf(stderr, "\b\b]\n");
-      pCmd = pCmd->pNext;
+      lpCmd = lpCmd->lpNext;
     }
   fprintf(stderr, "end program commands\n");
 }
@@ -228,102 +229,102 @@ typedef enum
 
 typedef struct stParseContext
 {
-  struct stProgram program;
-  LPCOMMAND pListTail;
+  struct stProgram lpProgram;
+  LPCOMMAND lpListTail;
 
-  LPSTR szSrc;
+  LPSTR lpszSrc;
   DWORD dwSrcIdx;
   PARSEMODE mode;
 
   SRCINFO srcInfo;
 
-  WORD wParseBufferSize;
-  WORD wParseBufferUsage;
+  WORD nParseBufferSize;
+  WORD nParseBufferSize;
   SLICE aParseBuffer[0];
 } *LPPARSECONTEXT;
 
-static LPPARSECONTEXT CreateParseContext(LPSTR szSrc,
+static LPPARSECONTEXT CreateParseContext(LPSTR lpszSrc,
                                          WORD parseBufferSize);
-static void ParseLine(LPPARSECONTEXT pCtx, LPERROR pError);
-static void ParseQuesMark(LPPARSECONTEXT pCtx, LPERROR pError);
-static void ParsePart(LPPARSECONTEXT pCtx, LPERROR pError);
-static SLICE ParseId(LPPARSECONTEXT pCtx, LPERROR pError);
-static SLICE ParseStr(LPPARSECONTEXT pCtx, LPERROR pError);
-static void CheckBufferSize(LPPARSECONTEXT pCtx, LPERROR pError);
-static void FinishLine(LPPARSECONTEXT pCtx, LPERROR pError);
+static void ParseLine(LPPARSECONTEXT lpCtx, LPERROR lpError);
+static void ParseQuesMark(LPPARSECONTEXT lpCtx, LPERROR lpError);
+static void ParsePart(LPPARSECONTEXT lpCtx, LPERROR lpError);
+static SLICE ParseId(LPPARSECONTEXT lpCtx, LPERROR lpError);
+static SLICE ParseStr(LPPARSECONTEXT lpCtx, LPERROR lpError);
+static void CheckBufferSize(LPPARSECONTEXT lpCtx, LPERROR lpError);
+static void FinishLine(LPPARSECONTEXT lpCtx, LPERROR lpError);
 static LPCOMMAND CreateCommandFS2(SRCINFO srcInfo,
                                   SLICE *aParts);
-static LPCOMMAND CreateCommandFS5(LPCOMMAND pPrev,
-                                  LPCOMMAND pNext,
-                                  LPVOID pExtraData,
+static LPCOMMAND CreateCommandFS5(LPCOMMAND lpPrev,
+                                  LPCOMMAND lpNext,
+                                  LPVOID lpExtraData,
                                   SRCINFO srcInfo,
                                   SLICE *aParts);
-static void SkipWhitespace(LPPARSECONTEXT pCtx);
-static void SkipComment(LPPARSECONTEXT pCtx);
-static CHAR CurChar(LPPARSECONTEXT pCtx);
-static PCHAR CurCharPos(LPPARSECONTEXT pCtx);
-static void NextChar(LPPARSECONTEXT pCtx);
+static void SkipWhitespace(LPPARSECONTEXT lpCtx);
+static void SkipComment(LPPARSECONTEXT lpCtx);
+static CHAR CurChar(LPPARSECONTEXT lpCtx);
+static PCHAR CurCharPos(LPPARSECONTEXT lpCtx);
+static void NextChar(LPPARSECONTEXT lpCtx);
 static BOOL IsIdChar(CHAR ch);
 static BOOL IsLineEnd(CHAR ch);
-static LPSTR ShrinkConv(PCHAR pStart, PCHAR pEnd);
+static LPSTR ShrinkConv(PCHAR pcStart, PCHAR pcEnd);
 
-LPPROGRAM ParseProgram(LPSTR szSource,
-                       WORD wParseBufferSize,
-                       LPERROR pError)
+LPPROGRAM ParseProgram(LPSTR lpszSource,
+                       WORD nParseBufferSize,
+                       LPERROR lpError)
 {
-  LPPARSECONTEXT pCtx = CreateParseContext
+  LPPARSECONTEXT lpCtx = CreateParseContext
     (
-      szSource,
-      wParseBufferSize
+      lpszSource,
+      nParseBufferSize
     );
-  if (pCtx == NULL)
+  if (lpCtx == NULL)
     {
       return NULL;
     }
-  while (CurChar(pCtx) != '\0')
+  while (CurChar(lpCtx) != '\0')
     {
-      ParseLine(pCtx, pError);
-      if (IsError(pError))
+      ParseLine(lpCtx, lpError);
+      if (IsError(lpError))
         {
           break;
         }
     }
 
-  LPPROGRAM pRet = (LPPROGRAM)malloc(sizeof(struct stProgram));
-  memcpy(pRet, &pCtx->program, sizeof(struct stProgram));
-  free(pCtx);
-  return pRet;
+  LPPROGRAM ret = (LPPROGRAM)malloc(sizeof(struct stProgram));
+  memcpy(ret, &lpCtx->lpProgram, sizeof(struct stProgram));
+  free(lpCtx);
+  return ret;
 }
 
-static LPPARSECONTEXT CreateParseContext(LPSTR szSrc,
-                                         WORD wParseBufferSize) {
-  LPPARSECONTEXT pRet = (LPPARSECONTEXT)malloc
+static LPPARSECONTEXT CreateParseContext(LPSTR lpszSrc,
+                                         WORD nParseBufferSize) {
+  LPPARSECONTEXT ret = (LPPARSECONTEXT)malloc
     (
-      sizeof(struct stParseContext) + wParseBufferSize * sizeof(SLICE)
+      sizeof(struct stParseContext) + nParseBufferSize * sizeof(SLICE)
     );
-  if (pRet == NULL) 
+  if (ret == NULL) 
     {
       return NULL;
     }
 
-  InitProgram(&pRet->program);
-  pRet->pListTail = NULL;
-  pRet->szSrc = szSrc;
-  pRet->dwSrcIdx = 0;
-  pRet->srcInfo = SourceInfo("<unknown-file>", 1);
-  pRet->mode = PARSE_SINGLE_LINE;
+  InitProgram(&ret->lpProgram);
+  ret->lpListTail = NULL;
+  ret->lpszSrc = lpszSrc;
+  ret->dwSrcIdx = 0;
+  ret->srcInfo = SourceInfo("<unknown-file>", 1);
+  ret->mode = PARSE_SINGLE_LINE;
 
-  pRet->wParseBufferSize = wParseBufferSize;
-  pRet->wParseBufferUsage = 0;
-  memset(pRet->aParseBuffer, 0, wParseBufferSize * sizeof(SLICE));
-  return pRet;
+  ret->nParseBufferSize = nParseBufferSize;
+  ret->nParseBufferSize = 0;
+  memset(ret->aParseBuffer, 0, nParseBufferSize * sizeof(SLICE));
+  return ret;
 }
 
-static void ParseLine(LPPARSECONTEXT pCtx, LPERROR pError) {
-  if (CurChar(pCtx) == '?')
+static void ParseLine(LPPARSECONTEXT lpCtx, LPERROR lpError) {
+  if (CurChar(lpCtx) == '?')
     {
-      ParseQuesMark(pCtx, pError);
-      if (IsError(pError))
+      ParseQuesMark(lpCtx, lpError);
+      if (IsError(lpError))
         {
           return;
         }
@@ -331,32 +332,32 @@ static void ParseLine(LPPARSECONTEXT pCtx, LPERROR pError) {
 
   while (TRUE)
     {
-      SkipWhitespace(pCtx);
-      if (CurChar(pCtx) == '\0' || CurChar(pCtx) == '\n')
+      SkipWhitespace(lpCtx);
+      if (CurChar(lpCtx) == '\0' || CurChar(lpCtx) == '\n')
         {
-          if (pCtx->mode == PARSE_SINGLE_LINE)
+          if (lpCtx->mode == PARSE_SINGLE_LINE)
             {
-              FinishLine(pCtx, pError);
+              FinishLine(lpCtx, lpError);
             }
-          if (pCtx->mode == PARSE_MULTI_LINE && CurChar(pCtx) == '\0')
+          if (lpCtx->mode == PARSE_MULTI_LINE && CurChar(lpCtx) == '\0')
             {
-              ErrPrintf(pError, PL2ERR_UNCLOSED_BEGIN, pCtx->srcInfo,
+              ErrPrintf(lpError, PL2ERR_UNCLOSED_BEGIN, lpCtx->srcInfo,
                         NULL, "unclosed `?begin` block");
             }
-          if (CurChar(pCtx) == '\n')
+          if (CurChar(lpCtx) == '\n')
             {
-              NextChar(pCtx);
+              NextChar(lpCtx);
             }
           return;
         }
-      else if (CurChar(pCtx) == '#')
+      else if (CurChar(lpCtx) == '#')
         {
-          SkipComment(pCtx);
+          SkipComment(lpCtx);
         }
       else
         {
-          ParsePart(pCtx, pError);
-          if (IsError(pError))
+          ParsePart(lpCtx, lpError);
+          if (IsError(lpError))
             {
               return;
             }
@@ -364,157 +365,157 @@ static void ParseLine(LPPARSECONTEXT pCtx, LPERROR pError) {
   }
 }
 
-static void ParseQuesMark(LPPARSECONTEXT pCtx, LPERROR pError)
+static void ParseQuesMark(LPPARSECONTEXT lpCtx, LPERROR lpError)
 {
-  assert(CurChar(pCtx) == '?');
-  NextChar(pCtx);
+  assert(CurChar(lpCtx) == '?');
+  NextChar(lpCtx);
 
-  PCHAR pStart = CurCharPos(pCtx);
-  while (isalnum((int)CurChar(pCtx)))
+  PCHAR pcStart = CurCharPos(lpCtx);
+  while (isalnum((int)CurChar(lpCtx)))
     {
-      NextChar(pCtx);
+      NextChar(lpCtx);
     }
-  PCHAR pEnd = CurCharPos(pCtx);
-  SLICE s = Slice(pStart, pEnd);
+  PCHAR pcEnd = CurCharPos(lpCtx);
+  SLICE s = Slice(pcStart, pcEnd);
   LPSTR szQuesCommand = SliceIntoCStr(s);
   
   if (!strcmp(szQuesCommand, "begin")) 
     {
-      pCtx->mode = PARSE_MULTI_LINE;
+      lpCtx->mode = PARSE_MULTI_LINE;
     }
   else if (!strcmp(szQuesCommand, "end"))
     {
-      pCtx->mode = PARSE_SINGLE_LINE;
-      FinishLine(pCtx, pError);
+      lpCtx->mode = PARSE_SINGLE_LINE;
+      FinishLine(lpCtx, lpError);
     }
   else
     {
-      ErrPrintf(pError, PL2ERR_UNKNOWN_QUES, pCtx->srcInfo,
+      ErrPrintf(lpError, PL2ERR_UNKNOWN_QUES, lpCtx->srcInfo,
                 NULL, "unknown question mark operator: `%s`",
                 szQuesCommand);
     }
 }
 
-static void ParsePart(LPPARSECONTEXT pCtx, LPERROR pError)
+static void ParsePart(LPPARSECONTEXT lpCtx, LPERROR lpError)
 {
   SLICE part;
-  if (CurChar(pCtx) == '"' || CurChar(pCtx) == '\'')
+  if (CurChar(lpCtx) == '"' || CurChar(lpCtx) == '\'')
     {
-      part = ParseStr(pCtx, pError);
+      part = ParseStr(lpCtx, lpError);
     }
   else
     {
-      part = ParseId(pCtx, pError);
+      part = ParseId(lpCtx, lpError);
     }
-  if (IsError(pError))
+  if (IsError(lpError))
     {
       return;
     }
 
-  CheckBufferSize(pCtx, pError);
-  if (IsError(pError))
+  CheckBufferSize(lpCtx, lpError);
+  if (IsError(lpError))
     {
       return;
     }
 
-  pCtx->aParseBuffer[pCtx->wParseBufferUsage++] = part;
+  lpCtx->aParseBuffer[lpCtx->nParseBufferSize++] = part;
 }
 
-static SLICE ParseId(LPPARSECONTEXT pCtx, LPERROR pError)
+static SLICE ParseId(LPPARSECONTEXT lpCtx, LPERROR lpError)
 {
-  (void)pError;
-  PCHAR pStart = CurCharPos(pCtx);
-  while (IsIdChar(CurChar(pCtx)))
+  (void)lpError;
+  PCHAR pcStart = CurCharPos(lpCtx);
+  while (IsIdChar(CurChar(lpCtx)))
     {
-      NextChar(pCtx);
+      NextChar(lpCtx);
     }
-  PCHAR pEnd = CurCharPos(pCtx);
-  return Slice(pStart, pEnd);
+  PCHAR pcEnd = CurCharPos(lpCtx);
+  return Slice(pcStart, pcEnd);
 }
 
-static SLICE ParseStr(LPPARSECONTEXT pCtx, LPERROR pError)
+static SLICE ParseStr(LPPARSECONTEXT lpCtx, LPERROR lpError)
 {
-  assert(CurChar(pCtx) == '"' || CurChar(pCtx) == '\'');
-  NextChar(pCtx);
+  assert(CurChar(lpCtx) == '"' || CurChar(lpCtx) == '\'');
+  NextChar(lpCtx);
 
-  PCHAR pStart = CurCharPos(pCtx);
-  while (CurChar(pCtx) != '"'
-         && CurChar(pCtx) != '\''
-         && !IsLineEnd(CurChar(pCtx)))
+  PCHAR pcStart = CurCharPos(lpCtx);
+  while (CurChar(lpCtx) != '"'
+         && CurChar(lpCtx) != '\''
+         && !IsLineEnd(CurChar(lpCtx)))
     {
-      if (CurChar(pCtx) == '\\')
+      if (CurChar(lpCtx) == '\\')
         {
-          NextChar(pCtx);
-          NextChar(pCtx);
+          NextChar(lpCtx);
+          NextChar(lpCtx);
         }
       else
         {
-          NextChar(pCtx);
+          NextChar(lpCtx);
         }
     }
 
-  PCHAR pEnd = CurCharPos(pCtx);
-  pEnd = ShrinkConv(pStart, pEnd);
+  PCHAR pcEnd = CurCharPos(lpCtx);
+  pcEnd = ShrinkConv(pcStart, pcEnd);
 
-  if (CurChar(pCtx) == '"' || CurChar(pCtx) == '\'')
+  if (CurChar(lpCtx) == '"' || CurChar(lpCtx) == '\'')
     {
-      NextChar(pCtx);
+      NextChar(lpCtx);
     }
   else
     {
-      ErrPrintf(pError, PL2ERR_UNCLOSED_BEGIN, pCtx->srcInfo,
+      ErrPrintf(lpError, PL2ERR_UNCLOSED_BEGIN, lpCtx->srcInfo,
                 NULL, "unclosed string literal");
       return NullSlice();
     }
-  return Slice(pStart, pEnd);
+  return Slice(pcStart, pcEnd);
 }
 
-static void CheckBufferSize(LPPARSECONTEXT pCtx, LPERROR pError)
+static void CheckBufferSize(LPPARSECONTEXT lpCtx, LPERROR lpError)
 {
-  if (pCtx->wParseBufferSize <= pCtx->wParseBufferUsage + 1)
+  if (lpCtx->nParseBufferSize <= lpCtx->nParseBufferSize + 1)
     {
-      ErrPrintf(pError, PL2ERR_UNCLOSED_BEGIN, pCtx->srcInfo,
+      ErrPrintf(lpError, PL2ERR_UNCLOSED_BEGIN, lpCtx->srcInfo,
                 NULL, "command parts exceed internal parsing buffer");
     }
 }
 
-static void FinishLine(LPPARSECONTEXT pCtx, LPERROR pError)
+static void FinishLine(LPPARSECONTEXT lpCtx, LPERROR lpError)
 {
-  (void)pError;
+  (void)lpError;
 
-  SRCINFO srcInfo = pCtx->srcInfo;
-  NextChar(pCtx);
-  if (pCtx->wParseBufferUsage == 0)
+  SRCINFO srcInfo = lpCtx->srcInfo;
+  NextChar(lpCtx);
+  if (lpCtx->nParseBufferSize == 0)
     {
       return;
     }
-  if (pCtx->pListTail == NULL)
+  if (lpCtx->lpListTail == NULL)
     {
-      assert(pCtx->program.pCommands == NULL);
-      pCtx->program.pCommands = pCtx->pListTail = CreateCommandFS2
+      assert(lpCtx->lpProgram.lpCommands == NULL);
+      lpCtx->lpProgram.lpCommands = lpCtx->lpListTail = CreateCommandFS2
         (
-          pCtx->srcInfo,
-          pCtx->aParseBuffer
+          lpCtx->srcInfo,
+          lpCtx->aParseBuffer
         );
     }
   else
     {
-      pCtx->pListTail = CreateCommandFS5
+      lpCtx->lpListTail = CreateCommandFS5
         (
-          pCtx->pListTail,
+          lpCtx->lpListTail,
           NULL,
           NULL,
-          pCtx->srcInfo,
-          pCtx->aParseBuffer
+          lpCtx->srcInfo,
+          lpCtx->aParseBuffer
         );
     }
-  if (pCtx->pListTail == NULL)
+  if (lpCtx->lpListTail == NULL)
     {
-      ErrPrintf(pError, PL2ERR_MALLOC, srcInfo, 0,
+      ErrPrintf(lpError, PL2ERR_MALLOC, srcInfo, 0,
                 "failed allocating COMMAND");
     }
-  memset(pCtx->aParseBuffer, 0, sizeof(SLICE) * pCtx->wParseBufferSize);
-  pCtx->wParseBufferUsage = 0;
+  memset(lpCtx->aParseBuffer, 0, sizeof(SLICE) * lpCtx->nParseBufferSize);
+  lpCtx->nParseBufferSize = 0;
 }
 
 static LPCOMMAND CreateCommandFS2(SRCINFO srcInfo,
@@ -523,53 +524,53 @@ static LPCOMMAND CreateCommandFS2(SRCINFO srcInfo,
   return CreateCommandFS5(NULL, NULL, NULL, srcInfo, aParts);
 }
 
-static LPCOMMAND CreateCommandFS5(LPCOMMAND pPrev,
-                                  LPCOMMAND pNext,
-                                  LPVOID pExtraData,
+static LPCOMMAND CreateCommandFS5(LPCOMMAND lpPrev,
+                                  LPCOMMAND lpNext,
+                                  LPVOID lpExtraData,
                                   SRCINFO srcInfo,
                                   SLICE *aParts)
 {
-  WORD wPartCount = 0;
-  for (; !IsNullSlice(aParts[wPartCount]); ++wPartCount);
+  WORD nPartCount = 0;
+  for (; !IsNullSlice(aParts[nPartCount]); ++nPartCount);
 
-  LPCOMMAND pRet = (LPCOMMAND)malloc
+  LPCOMMAND ret = (LPCOMMAND)malloc
     (
-      sizeof(struct stCommand) + wPartCount * sizeof(LPSTR)
+      sizeof(struct stCommand) + nPartCount * sizeof(LPSTR)
     );
-  if (pRet == NULL)
+  if (ret == NULL)
     {
       return NULL;
     }
 
-  pRet->pPrev = pPrev;
-  if (pPrev != NULL)
+  ret->lpPrev = lpPrev;
+  if (lpPrev != NULL)
     {
-      pPrev->pNext = pRet;
+      lpPrev->lpNext = ret;
     }
-  pRet->pNext = pNext;
-  if (pNext != NULL)
+  ret->lpNext = lpNext;
+  if (lpNext != NULL)
     {
-      pNext->pPrev = pRet;
+      lpNext->lpPrev = ret;
     }
-  pRet->pExtraData = pExtraData;
-  pRet->srcInfo = srcInfo;
-  pRet->szCmd = SliceIntoCStr(aParts[0]);
-  for (WORD i = 1; i < wPartCount; i++)
+  ret->lpExtraData = lpExtraData;
+  ret->srcInfo = srcInfo;
+  ret->lpszCmd = SliceIntoCStr(aParts[0]);
+  for (WORD i = 1; i < nPartCount; i++)
     {
-      pRet->aArgs[i - 1] = SliceIntoCStr(aParts[i]);
+      ret->aszArgs[i - 1] = SliceIntoCStr(aParts[i]);
     }
-  pRet->aArgs[wPartCount - 1] = NULL;
-  return pRet;
+  ret->aszArgs[nPartCount - 1] = NULL;
+  return ret;
 }
 
-static void SkipWhitespace(LPPARSECONTEXT pCtx)
+static void SkipWhitespace(LPPARSECONTEXT lpCtx)
 {
   while (1)
     {
-      switch (CurChar(pCtx))
+      switch (CurChar(lpCtx))
         {
           case ' ': case '\t': case '\f': case '\v': case '\r':
-            NextChar(pCtx);
+            NextChar(lpCtx);
             break;
           default:
             return;
@@ -577,45 +578,45 @@ static void SkipWhitespace(LPPARSECONTEXT pCtx)
     }
 }
 
-static void SkipComment(LPPARSECONTEXT pCtx)
+static void SkipComment(LPPARSECONTEXT lpCtx)
 {
-  assert(CurChar(pCtx) == '#');
-  NextChar(pCtx);
+  assert(CurChar(lpCtx) == '#');
+  NextChar(lpCtx);
 
-  while (!IsLineEnd(CurChar(pCtx)))
+  while (!IsLineEnd(CurChar(lpCtx)))
     {
-      NextChar(pCtx);
+      NextChar(lpCtx);
     }
 
-  if (CurChar(pCtx) == '\n')
+  if (CurChar(lpCtx) == '\n')
     {
-      NextChar(pCtx);
+      NextChar(lpCtx);
     }
 }
 
-static CHAR CurChar(LPPARSECONTEXT pCtx)
+static CHAR CurChar(LPPARSECONTEXT lpCtx)
 {
-  return pCtx->szSrc[pCtx->dwSrcIdx];
+  return lpCtx->lpszSrc[lpCtx->dwSrcIdx];
 }
 
-static PCHAR CurCharPos(LPPARSECONTEXT pCtx)
+static PCHAR CurCharPos(LPPARSECONTEXT lpCtx)
 {
-  return pCtx->szSrc + pCtx->dwSrcIdx;
+  return lpCtx->lpszSrc + lpCtx->dwSrcIdx;
 }
 
-static void NextChar(LPPARSECONTEXT pCtx)
+static void NextChar(LPPARSECONTEXT lpCtx)
 {
-  if (pCtx->szSrc[pCtx->dwSrcIdx] == '\0')
+  if (lpCtx->lpszSrc[lpCtx->dwSrcIdx] == '\0')
     {
       return;
     }
   else
     {
-      if (pCtx->szSrc[pCtx->dwSrcIdx] == '\n')
+      if (lpCtx->lpszSrc[lpCtx->dwSrcIdx] == '\n')
         {
-          pCtx->srcInfo.wLine += 1;
+          lpCtx->srcInfo.nLine += 1;
         }
-      pCtx->dwSrcIdx += 1;
+      lpCtx->dwSrcIdx += 1;
     }
 }
 
@@ -651,10 +652,10 @@ static BOOL IsLineEnd(CHAR ch)
   return ch == '\0' || ch == '\n';
 }
 
-static LPSTR ShrinkConv(PCHAR start, PCHAR end)
+static LPSTR ShrinkConv(PCHAR pcStart, PCHAR pcEnd)
 {
-  PCHAR iter1 = start, iter2 = start;
-  while (iter1 != end)
+  PCHAR iter1 = pcStart, iter2 = pcStart;
+  while (iter1 != pcEnd)
     {
       if (iter1[0] == '\\')
         {
@@ -681,20 +682,20 @@ static LPSTR ShrinkConv(PCHAR start, PCHAR end)
 
 /*** -------------------- Semantic-ver parsing  -------------------- ***/
 
-static LPCSTR ParseUint16(LPCSTR szSrc,
-                          WORD *pOutput,
-                          LPERROR pError);
+static LPCSTR ParseUint16(LPCSTR lpszSrc,
+                          WORD *lpnOutput,
+                          LPERROR lpError);
 
-static void ParseSemVerPostfix(LPCSTR src,
-                               LPSTR output,
-                               LPERROR pError);
+static void ParseSemVerPostfix(LPCSTR lpszSrc,
+                               LPSTR lpszOutput,
+                               LPERROR lpError);
 
 SEMVER ZeroVersion(void)
 {
   SEMVER ret;
-  ret.wMajor = 0;
-  ret.wMinor = 0;
-  ret.wPatch = 0;
+  ret.nMajor = 0;
+  ret.nMinor = 0;
+  ret.nPatch = 0;
   memset(ret.szPostfix, 0, SEMVER_POSTFIX_LEN);
   ret.bExact = FALSE;
   return ret;
@@ -702,9 +703,9 @@ SEMVER ZeroVersion(void)
 
 BOOL IsZeroVersion(SEMVER ver)
 {
-  return ver.wMajor == 0
-         && ver.wMinor == 0
-         && ver.wPatch == 0
+  return ver.nMajor == 0
+         && ver.nMinor == 0
+         && ver.nPatch == 0
          && ver.szPostfix[0] == 0
          && ver.bExact == 0;
 }
@@ -716,91 +717,91 @@ BOOL IsAlpha(SEMVER ver)
 
 BOOL IsStable(SEMVER ver)
 {
-  return !IsAlpha(ver) && ver.wMajor != 0;
+  return !IsAlpha(ver) && ver.nMajor != 0;
 }
 
-SEMVER ParseSemVer(LPCSTR szSrc, LPERROR pError)
+SEMVER ParseSemVer(LPCSTR lpszSrc, LPERROR lpError)
 {
   SEMVER ret = ZeroVersion();
-  if (szSrc[0] == '^')
+  if (lpszSrc[0] == '^')
     {
       ret.bExact = 1;
-      szSrc++;
+      lpszSrc++;
     }
 
-  szSrc = ParseUint16(szSrc, &ret.wMajor, pError);
-  if (IsError(pError))
+  lpszSrc = ParseUint16(lpszSrc, &ret.nMajor, lpError);
+  if (IsError(lpError))
     {
-      ErrPrintf(pError, PL2ERR_SEMVER_PARSE,
+      ErrPrintf(lpError, PL2ERR_SEMVER_PARSE,
                 SourceInfo(NULL, 0), NULL,
                 "missing major version");
       goto done;
     }
-  else if (szSrc[0] == '\0')
+  else if (lpszSrc[0] == '\0')
     {
       goto done;
     }
-  else if (szSrc[0] == '-')
+  else if (lpszSrc[0] == '-')
     {
       goto parse_postfix;
     }
-  else if (szSrc[0] != '.')
+  else if (lpszSrc[0] != '.')
     {
-      ErrPrintf(pError, PL2ERR_SEMVER_PARSE,
+      ErrPrintf(lpError, PL2ERR_SEMVER_PARSE,
                 SourceInfo(NULL, 0), NULL,
-                "expected `.`, got `%c`", szSrc[0]);
+                "expected `.`, got `%c`", lpszSrc[0]);
       goto done;
     }
-  szSrc++;
-  szSrc = ParseUint16(szSrc, &ret.wMinor, pError);
-  if (IsError(pError))
+  lpszSrc++;
+  lpszSrc = ParseUint16(lpszSrc, &ret.nMinor, lpError);
+  if (IsError(lpError))
     {
-      ErrPrintf(pError, PL2ERR_SEMVER_PARSE,
+      ErrPrintf(lpError, PL2ERR_SEMVER_PARSE,
                 SourceInfo(NULL, 0),
                 NULL, "missing minor version");
       goto done;
     }
-  else if (szSrc[0] == '\0')
+  else if (lpszSrc[0] == '\0')
     {
       goto done;
     }
-  else if (szSrc[0] == '-')
+  else if (lpszSrc[0] == '-')
     {
       goto parse_postfix;
     }
-  else if (szSrc[0] != '.')
+  else if (lpszSrc[0] != '.')
     {
-      ErrPrintf(pError, PL2ERR_SEMVER_PARSE,
+      ErrPrintf(lpError, PL2ERR_SEMVER_PARSE,
                 SourceInfo(NULL, 0), NULL,
-                "expected `.`, got `%c`", szSrc[0]);
+                "expected `.`, got `%c`", lpszSrc[0]);
       goto done;
     }
 
-  szSrc++;
-  szSrc = ParseUint16(szSrc, &ret.wPatch, pError);
-  if (IsError(pError))
+  lpszSrc++;
+  lpszSrc = ParseUint16(lpszSrc, &ret.nPatch, lpError);
+  if (IsError(lpError))
     {
-      ErrPrintf(pError, PL2ERR_SEMVER_PARSE,
+      ErrPrintf(lpError, PL2ERR_SEMVER_PARSE,
                 SourceInfo(NULL, 0), NULL,
                 "missing patch version");
       goto done;
     }
-  else if (szSrc[0] == '\0')
+  else if (lpszSrc[0] == '\0')
     {
       goto done;
     }
-  else if (szSrc[0] != '-')
+  else if (lpszSrc[0] != '-')
     {
-      ErrPrintf(pError, PL2ERR_SEMVER_PARSE,
+      ErrPrintf(lpError, PL2ERR_SEMVER_PARSE,
                 SourceInfo(NULL, 0), NULL,
                 "unterminated semver, "
                 "expected `-` or `\\0`, got `%c`",
-                szSrc[0]);
+                lpszSrc[0]);
       goto done;
     }
 
 parse_postfix:
-  ParseSemVerPostfix(szSrc, ret.szPostfix, pError);
+  ParseSemVerPostfix(lpszSrc, ret.szPostfix, lpError);
 
 done:
   return ret;
@@ -816,15 +817,15 @@ BOOL IsCompatible(SEMVER expected, SEMVER actual)
     }
   if (expected.bExact)
     {
-      return expected.wMajor == actual.wMajor
-             && expected.wMinor == actual.wMinor
-             && expected.wPatch == actual.wPatch;
+      return expected.nMajor == actual.nMajor
+             && expected.nMinor == actual.nMinor
+             && expected.nPatch == actual.nPatch;
     }
-  else if (expected.wMajor == actual.wMajor)
+  else if (expected.nMajor == actual.nMajor)
     {
-      return (expected.wMinor == actual.wMinor
-              && expected.wPatch < actual.wPatch)
-             || (expected.wMinor < actual.wMinor);
+      return (expected.nMinor == actual.nMinor
+              && expected.nPatch < actual.nPatch)
+             || (expected.nMinor < actual.nMinor);
     }
   else
     {
@@ -839,27 +840,27 @@ CMPRESULT CompareSemVer(SEMVER ver1, SEMVER ver2)
       return CMP_NONE;
     }
 
-  if (ver1.wMajor < ver2.wMajor)
+  if (ver1.nMajor < ver2.nMajor)
     {
       return CMP_LESS;
     }
-  else if (ver1.wMajor > ver2.wMajor)
+  else if (ver1.nMajor > ver2.nMajor)
     {
       return CMP_GREATER;
     }
-  else if (ver1.wMinor < ver2.wMinor)
+  else if (ver1.nMinor < ver2.nMinor)
     {
       return CMP_LESS;
     }
-  else if (ver1.wMinor > ver2.wMinor)
+  else if (ver1.nMinor > ver2.nMinor)
     {
       return CMP_GREATER;
     }
-  else if (ver1.wPatch < ver2.wPatch)
+  else if (ver1.nPatch < ver2.nPatch)
     {
       return CMP_LESS;
     }
-  else if (ver1.wPatch > ver2.wPatch)
+  else if (ver1.nPatch > ver2.nPatch)
     {
       return CMP_GREATER;
     }
@@ -869,71 +870,71 @@ CMPRESULT CompareSemVer(SEMVER ver1, SEMVER ver2)
     }
 }
 
-void FormatSemVer(SEMVER ver, LPSTR szBuffer)
+void FormatSemVer(SEMVER ver, LPSTR lpszBuffer)
 {
   if (ver.szPostfix[0]) 
     {
-      sprintf(szBuffer, "%s%u.%u.%u-%s",
+      sprintf(lpszBuffer, "%s%u.%u.%u-%s",
               ver.bExact ? "^" : "",
-              ver.wMajor,
-              ver.wMinor,
-              ver.wPatch,
+              ver.nMajor,
+              ver.nMinor,
+              ver.nPatch,
               ver.szPostfix);
     }
   else
     {
-      sprintf(szBuffer, "%s%u.%u.%u",
+      sprintf(lpszBuffer, "%s%u.%u.%u",
               ver.bExact ? "^" : "",
-              ver.wMajor,
-              ver.wMinor,
-              ver.wPatch);
+              ver.nMajor,
+              ver.nMinor,
+              ver.nPatch);
     }
 }
 
-static LPCSTR ParseUint16(LPCSTR szSrc,
-                          WORD *wOutput,
-                          LPERROR pError)
+static LPCSTR ParseUint16(LPCSTR lpszSrc,
+                          WORD *lpnOutput,
+                          LPERROR lpError)
 {
-  if (!isdigit((int)szSrc[0]))
+  if (!isdigit((int)lpszSrc[0]))
     {
-      ErrPrintf(pError, PL2ERR_SEMVER_PARSE,
+      ErrPrintf(lpError, PL2ERR_SEMVER_PARSE,
                 SourceInfo(NULL, 0),
                 NULL, "expected numeric version");
       return NULL;
     }
-  *wOutput = 0;
-  while (isdigit((int)szSrc[0]))
+  *lpnOutput = 0;
+  while (isdigit((int)lpszSrc[0]))
     {
-      *wOutput *= 10;
-      *wOutput += szSrc[0] - '0';
-      ++szSrc;
+      *lpnOutput *= 10;
+      *lpnOutput += lpszSrc[0] - '0';
+      ++lpszSrc;
     }
-  return szSrc;
+  return lpszSrc;
 }
 
-static void ParseSemVerPostfix(LPCSTR szSrc,
-                               LPSTR szOutput,
-                               LPERROR pError)
+static void ParseSemVerPostfix(LPCSTR lpszSrc,
+                               LPSTR lpszOutput,
+                               LPERROR lpError)
 {
-  assert(szSrc[0] == '-');
-  ++szSrc;
-  if (szSrc[0] == '\0')
+  assert(lpszSrc[0] == '-');
+  ++lpszSrc;
+  if (lpszSrc[0] == '\0')
     {
-      ErrPrintf(pError, PL2ERR_SEMVER_PARSE,
+      ErrPrintf(lpError, PL2ERR_SEMVER_PARSE,
                 SourceInfo(NULL, 0), NULL,
                 "empty semver postfix");
       return;
     }
   for (size_t i = 0; i < SEMVER_POSTFIX_LEN - 1; i++)
     {
-      if (!(*szOutput++ = *szSrc++))
+      if (!(*lpszOutput++ = *lpszSrc++))
         {
           return;
         }
     }
-  if (szSrc[0] != '\0')
+  if (lpszSrc[0] != '\0')
     {
-      ErrPrintf(pError, PL2ERR_SEMVER_PARSE,
+      ErrPrintf(lpError, PL2ERR_SEMVER_PARSE,
                 SourceInfo(NULL, 0), NULL,
                 "semver postfix too long");
       return;
@@ -944,149 +945,149 @@ static void ParseSemVerPostfix(LPCSTR szSrc,
 
 typedef struct stRunContext
 {
-  LPPROGRAM pProgram;
-  LPCOMMAND pCurCmd;
-  LPVOID pUserContext;
+  LPPROGRAM lpProgram;
+  LPCOMMAND lpCurCmd;
+  LPVOID lpUserContext;
 
   HMODULE hModule;
-  LPLANGUAGE pLanguage;
+  LPLANGUAGE lpLanguage;
   BOOL bOwnLanguage;
 } *LPRUNCONTEXT;
 
-static LPRUNCONTEXT CreateRunContext(LPPROGRAM pProgram);
-static void DestroyRunContext(LPRUNCONTEXT pCtx);
-static BOOL HandleCommand(LPRUNCONTEXT pContext,
-                          LPCOMMAND pCmd,
-                          LPERROR pError);
-static BOOL LoadLanguage(LPRUNCONTEXT pContext,
-                         LPCOMMAND pCmd,
-                         LPERROR pError);
+static LPRUNCONTEXT CreateRunContext(LPPROGRAM lpProgram);
+static void DestroyRunContext(LPRUNCONTEXT lpCtx);
+static BOOL HandleCommand(LPRUNCONTEXT lpContext,
+                          LPCOMMAND lpCmd,
+                          LPERROR lpError);
+static BOOL LoadLanguage(LPRUNCONTEXT lpContext,
+                         LPCOMMAND lpCmd,
+                         LPERROR lpError);
 static LPLANGUAGE EasyLoad(HMODULE hModule,
-                           LPCSTR *aCmdNames,
-                           LPERROR pError);
+                           LPCSTR *aszCmdNames,
+                           LPERROR lpError);
 
-void RunProgram(LPPROGRAM pProgram, LPERROR pError)
+void RunProgram(LPPROGRAM lpProgram, LPERROR lpError)
 {
-  LPRUNCONTEXT pContext = CreateRunContext(pProgram);
-  if (pContext == NULL)
+  LPRUNCONTEXT lpContext = CreateRunContext(lpProgram);
+  if (lpContext == NULL)
     {
-      ErrPrintf(pError, PL2ERR_MALLOC, SourceInfo(NULL, 0),
+      ErrPrintf(lpError, PL2ERR_MALLOC, SourceInfo(NULL, 0),
                 NULL, "run: cannot allocate memory for run context");
       return;
     }
 
-  while (HandleCommand(pContext, pContext->pCurCmd, pError))
+  while (HandleCommand(lpContext, lpContext->lpCurCmd, lpError))
     {
-      if (IsError(pError))
+      if (IsError(lpError))
         {
           break;
         }
     }
 
-  DestroyRunContext(pContext);
+  DestroyRunContext(lpContext);
 }
 
-static LPRUNCONTEXT CreateRunContext(LPPROGRAM pProgram)
+static LPRUNCONTEXT CreateRunContext(LPPROGRAM lpProgram)
 {
-  LPRUNCONTEXT pRet = (LPRUNCONTEXT)malloc(sizeof(struct stRunContext));
-  if (pRet == NULL)
+  LPRUNCONTEXT ret = (LPRUNCONTEXT)malloc(sizeof(struct stRunContext));
+  if (ret == NULL)
     {
       return NULL;
     }
 
-  pRet->pProgram = pProgram;
-  pRet->pCurCmd = pProgram->pCommands;
-  pRet->pUserContext = NULL;
-  pRet->hModule = NULL;
-  pRet->pLanguage = NULL;
-  return pRet;
+  ret->lpProgram = lpProgram;
+  ret->lpCurCmd = lpProgram->lpCommands;
+  ret->lpUserContext = NULL;
+  ret->hModule = NULL;
+  ret->lpLanguage = NULL;
+  return ret;
 }
 
-static void DestroyRunContext(LPRUNCONTEXT pCtx)
+static void DestroyRunContext(LPRUNCONTEXT lpCtx)
 {
-  if (pCtx->hModule != NULL) 
+  if (lpCtx->hModule != NULL) 
     {
-      if (pCtx->pLanguage != NULL)
+      if (lpCtx->lpLanguage != NULL)
         {
-          if (pCtx->pLanguage->pfnAtexitProc != NULL)
+          if (lpCtx->lpLanguage->lpfnAtexitProc != NULL)
             {
-              pCtx->pLanguage->pfnAtexitProc(pCtx->pUserContext);
+              lpCtx->lpLanguage->lpfnAtexitProc(lpCtx->lpUserContext);
             }
-          if (pCtx->bOwnLanguage)
+          if (lpCtx->bOwnLanguage)
             {
-              free(pCtx->pLanguage->aSinvokeHandlers);
-              free(pCtx->pLanguage->aWCallHandlers);
-              free(pCtx->pLanguage);
+              free(lpCtx->lpLanguage->aSinvokeHandlers);
+              free(lpCtx->lpLanguage->aWCallHandlers);
+              free(lpCtx->lpLanguage);
             }
-          pCtx->pLanguage = NULL;
+          lpCtx->lpLanguage = NULL;
         }
-      if (FreeLibrary(pCtx->hModule) == 0)
+      if (FreeLibrary(lpCtx->hModule) == 0)
         {
         fprintf(stderr, "[int/e] error invoking FreeLibrary: %ld\n",
                 GetLastError());
       }
     }
-  free(pCtx);
+  free(lpCtx);
 }
 
-static BOOL HandleCommand(LPRUNCONTEXT pCtx,
-                          LPCOMMAND pCmd,
-                          LPERROR pError)
+static BOOL HandleCommand(LPRUNCONTEXT lpCtx,
+                          LPCOMMAND lpCmd,
+                          LPERROR lpError)
 {
-  if (pCmd == NULL)
+  if (lpCmd == NULL)
     {
       return FALSE;
     }
 
-  if (!strcmp(pCmd->szCmd, "language"))
+  if (!strcmp(lpCmd->lpszCmd, "language"))
     {
-      return LoadLanguage(pCtx, pCmd, pError);
+      return LoadLanguage(lpCtx, lpCmd, lpError);
     }
-  else if (!strcmp(pCmd->szCmd, "abort"))
+  else if (!strcmp(lpCmd->lpszCmd, "abort"))
     {
       return FALSE;
     }
 
-  if (pCtx->pLanguage == NULL)
+  if (lpCtx->lpLanguage == NULL)
     {
-      ErrPrintf(pError, PL2ERR_NO_LANG, pCmd->srcInfo, NULL,
+      ErrPrintf(lpError, PL2ERR_NO_LANG, lpCmd->srcInfo, NULL,
                 "no language loaded to execute user command");
       return FALSE;
     }
 
-  for (SINVHANDLER *iter = pCtx->pLanguage->aSinvokeHandlers;
+  for (SINVHANDLER *iter = lpCtx->lpLanguage->aSinvokeHandlers;
        iter != NULL && !IS_EMPTY_SINVOKE_CMD(iter);
        ++iter)
     {
-      if (!iter->bRemoved && !strcmp(pCmd->szCmd, iter->szCmdName))
+      if (!iter->bRemoved && !strcmp(lpCmd->lpszCmd, iter->lpszCmdName))
         {
           if (iter->bDeprecated)
             {
               fprintf(stderr, "[int/w] using deprecated command: %s\n",
-                      iter->szCmdName);
+                      iter->lpszCmdName);
             }
-          if (iter->pfnHandlerProc != NULL)
+          if (iter->lpfnHandlerProc != NULL)
             {
-              iter->pfnHandlerProc((LPCSTR*)pCmd->aArgs);
+              iter->lpfnHandlerProc((LPCSTR*)lpCmd->aszArgs);
             }
-          pCtx->pCurCmd = pCmd->pNext;
+          lpCtx->lpCurCmd = lpCmd->lpNext;
           return TRUE;
         }
     }
 
-  for (WCALLHANDLER *iter = pCtx->pLanguage->aWCallHandlers;
+  for (WCALLHANDLER *iter = lpCtx->lpLanguage->aWCallHandlers;
        iter != NULL && !IS_EMPTY_CMD(iter);
        ++iter)
     {
-      if (!iter->bRemoved && !strcmp(pCmd->szCmd, iter->szCmdName))
+      if (!iter->bRemoved && !strcmp(lpCmd->lpszCmd, iter->lpszCmdName))
         {
-          if (iter->szCmdName != NULL
-              && strcmp(pCmd->szCmd, iter->szCmdName) != 0)
+          if (iter->lpszCmdName != NULL
+              && strcmp(lpCmd->lpszCmd, iter->lpszCmdName) != 0)
             {
               // Do nothing if so
             }
-          else if (iter->pfnRouterProc != NULL
-                   && !iter->pfnRouterProc(pCmd->szCmd))
+          else if (iter->lpfnRouterProc != NULL
+                   && !iter->lpfnRouterProc(lpCmd->lpszCmd))
             {
               // Do nothing if so
             }
@@ -1096,253 +1097,253 @@ static BOOL HandleCommand(LPRUNCONTEXT pCtx,
                 {
                   fprintf(stderr,
                           "[int/w] using deprecated command: %s\n",
-                          iter->szCmdName);
+                          iter->lpszCmdName);
                 }
-              if (iter->pfnHandlerProc == NULL)
+              if (iter->lpfnHandlerProc == NULL)
                 {
-                  pCtx->pCurCmd = pCmd->pNext;
+                  lpCtx->lpCurCmd = lpCmd->lpNext;
                   return TRUE;
                 }
 
-              LPCOMMAND pNextCmd = iter->pfnHandlerProc
+              LPCOMMAND pNextCmd = iter->lpfnHandlerProc
                 (
-                  pCtx->pProgram,
-                  pCtx->pUserContext,
-                  pCmd,
-                  pError
+                  lpCtx->lpProgram,
+                  lpCtx->lpUserContext,
+                  lpCmd,
+                  lpError
                 );
-              if (IsError(pError))
+              if (IsError(lpError))
                 {
                   return 0;
                 }
-              if (pNextCmd == pCtx->pLanguage->pTermCmd)
+              if (pNextCmd == lpCtx->lpLanguage->lpTermCmd)
                 {
                   return 0;
                 }
-              pCtx->pCurCmd = pNextCmd ? pNextCmd : pCmd->pNext;
+              lpCtx->lpCurCmd = pNextCmd ? pNextCmd : lpCmd->lpNext;
               return 1;
             }
         }
     }
 
-  if (pCtx->pLanguage->pfnFallbackProc == NULL)
+  if (lpCtx->lpLanguage->lpfnFallbackProc == NULL)
     {
-      ErrPrintf(pError, PL2ERR_UNKNOWN_CMD, pCmd->srcInfo, NULL,
+      ErrPrintf(lpError, PL2ERR_UNKNOWN_CMD, lpCmd->srcInfo, NULL,
                 "`%s` is not recognized as an internal or external "
-                "command, operable pProgram or batch file",
-                pCmd->szCmd);
+                "command, operable lpProgram or batch file",
+                lpCmd->lpszCmd);
       return 0;
     }
 
-  LPCOMMAND pNextCmd = pCtx->pLanguage->pfnFallbackProc
+  LPCOMMAND pNextCmd = lpCtx->lpLanguage->lpfnFallbackProc
     (
-      pCtx->pProgram,
-      pCtx->pUserContext,
-      pCmd,
-      pError
+      lpCtx->lpProgram,
+      lpCtx->lpUserContext,
+      lpCmd,
+      lpError
     );
 
-  if (pNextCmd == pCtx->pLanguage->pTermCmd)
+  if (pNextCmd == lpCtx->lpLanguage->lpTermCmd)
     {
-      ErrPrintf(pError, PL2ERR_UNKNOWN_CMD, pCmd->srcInfo, NULL,
+      ErrPrintf(lpError, PL2ERR_UNKNOWN_CMD, lpCmd->srcInfo, NULL,
                 "`%s` is not recognized as an internal or external "
-                "command, operable pProgram or batch file",
-                pCmd->szCmd);
+                "command, operable lpProgram or batch file",
+                lpCmd->lpszCmd);
       return 0;
     }
 
-  if (IsError(pError))
+  if (IsError(lpError))
     {
       return 0;
     }
-  if (pNextCmd == pCtx->pLanguage->pTermCmd)
+  if (pNextCmd == lpCtx->lpLanguage->lpTermCmd)
     {
       return 0;
     }
 
-  pCtx->pCurCmd = pNextCmd ? pNextCmd : pCmd->pNext;
+  lpCtx->lpCurCmd = pNextCmd ? pNextCmd : lpCmd->lpNext;
   return 1;
 }
 
-static BOOL LoadLanguage(LPRUNCONTEXT pCtx,
-                         LPCOMMAND pCmd,
-                         LPERROR pError)
+static BOOL LoadLanguage(LPRUNCONTEXT lpCtx,
+                         LPCOMMAND lpCmd,
+                         LPERROR lpError)
 {
-  if (pCtx->pLanguage != NULL)
+  if (lpCtx->lpLanguage != NULL)
     {
-      ErrPrintf(pError, PL2ERR_LOAD_LANG, pCmd->srcInfo, NULL,
+      ErrPrintf(lpError, PL2ERR_LOAD_LANG, lpCmd->srcInfo, NULL,
                 "language: another language already loaded");
       return FALSE;
     }
 
-  WORD wArgCount = CountCommandArgs(pCmd);
-  if (wArgCount != 2)
+  WORD nArgCount = CountCommandArgs(lpCmd);
+  if (nArgCount != 2)
     {
-      ErrPrintf(pError, PL2ERR_LOAD_LANG, pCmd->srcInfo, NULL,
+      ErrPrintf(lpError, PL2ERR_LOAD_LANG, lpCmd->srcInfo, NULL,
                 "language: expected 2 argument, got %u",
-                wArgCount);
+                nArgCount);
       return FALSE;
     }
 
-  LPCSTR szLangId = pCmd->aArgs[0];
-  SEMVER langVer = ParseSemVer(pCmd->aArgs[1], pError);
-  if (IsError(pError)) 
+  LPCSTR lpszLangId = lpCmd->aszArgs[0];
+  SEMVER langVer = ParseSemVer(lpCmd->aszArgs[1], lpError);
+  if (IsError(lpError)) 
     {
       return FALSE;
     }
 
   static CHAR s_szBuffer[4096];
   strcpy(s_szBuffer, "./lib");
-  strcat(s_szBuffer, szLangId);
+  strcat(s_szBuffer, lpszLangId);
   strcat(s_szBuffer, ".dll");
-  pCtx->hModule = LoadLibraryA(s_szBuffer);
+  lpCtx->hModule = LoadLibraryA(s_szBuffer);
 
-  if (pCtx->hModule == NULL)
+  if (lpCtx->hModule == NULL)
     {
-      ErrPrintf(pError, PL2ERR_LOAD_LANG, pCmd->srcInfo, NULL,
+      ErrPrintf(lpError, PL2ERR_LOAD_LANG, lpCmd->srcInfo, NULL,
                 "language: cannot load language library `%s`: %ld",
-                szLangId, GetLastError());
+                lpszLangId, GetLastError());
       return FALSE;
     }
 
-  LPLOADPROC pfnLoadProc = (LPLOADPROC)GetProcAddress
+  LPLOADPROC lpfnLoadProc = (LPLOADPROC)GetProcAddress
     (
-      pCtx->hModule,
+      lpCtx->hModule,
       "LoadLanguageExtension"
     );
-  if (pfnLoadProc == NULL)
+  if (lpfnLoadProc == NULL)
     {
-      LPEASYLOADPROC pfnEasyLoadProc = (LPEASYLOADPROC)GetProcAddress
+      LPEASYLOADPROC lpfnEasyLoadProc = (LPEASYLOADPROC)GetProcAddress
         (
-          pCtx->hModule,
+          lpCtx->hModule,
           "EasyLoadLanguageExtension"
         );
 
-      if (pfnEasyLoadProc == NULL)
+      if (lpfnEasyLoadProc == NULL)
         {
-          ErrPrintf(pError, PL2ERR_LOAD_LANG, pCmd->srcInfo, NULL,
+          ErrPrintf(lpError, PL2ERR_LOAD_LANG, lpCmd->srcInfo, NULL,
                     "language: cannot locate `%s` or `%s` "
                     "on library `%s`: %ld",
                     "LoadLanguageExtension",
                     "EasyLoadLanguageExtension",
-                    szLangId,
+                    lpszLangId,
                     GetLastError());
           return FALSE;
         }
 
-      pCtx->pLanguage = EasyLoad(pCtx->hModule, pfnEasyLoadProc(), pError);
-      if (IsError(pError))
+      lpCtx->lpLanguage = EasyLoad(lpCtx->hModule, lpfnEasyLoadProc(), lpError);
+      if (IsError(lpError))
         {
-          pError->srcInfo = pCmd->srcInfo;
+          lpError->srcInfo = lpCmd->srcInfo;
           return FALSE;
         }
-      pCtx->bOwnLanguage = TRUE;
+      lpCtx->bOwnLanguage = TRUE;
     }
   else
     {
-      pCtx->pLanguage = pfnLoadProc(langVer, pError);
-      if (IsError(pError))
+      lpCtx->lpLanguage = lpfnLoadProc(langVer, lpError);
+      if (IsError(lpError))
         {
-          pError->srcInfo = pCmd->srcInfo;
+          lpError->srcInfo = lpCmd->srcInfo;
           return FALSE;
         }
-      pCtx->bOwnLanguage = FALSE;
+      lpCtx->bOwnLanguage = FALSE;
     }
 
-  if (pCtx->pLanguage != NULL && pCtx->pLanguage->pfnInitProc != NULL)
+  if (lpCtx->lpLanguage != NULL && lpCtx->lpLanguage->lpfnInitProc != NULL)
     {
-      pCtx->pUserContext = pCtx->pLanguage->pfnInitProc(pError);
-      if (IsError(pError))
+      lpCtx->lpUserContext = lpCtx->lpLanguage->lpfnInitProc(lpError);
+      if (IsError(lpError))
         {
-          pError->srcInfo = pCmd->srcInfo;
+          lpError->srcInfo = lpCmd->srcInfo;
           return FALSE;
         }
     }
 
-  pCtx->pCurCmd = pCmd->pNext;
+  lpCtx->lpCurCmd = lpCmd->lpNext;
   return TRUE;
 }
 
 static LPLANGUAGE EasyLoad(HMODULE hModule,
-                           LPCSTR *aCmdNames,
-                           LPERROR pError)
+                           LPCSTR *aszCmdNames,
+                           LPERROR lpError)
 {
-  if (aCmdNames == NULL || aCmdNames[0] == NULL)
+  if (aszCmdNames == NULL || aszCmdNames[0] == NULL)
     {
       return NULL;
     }
 
   WORD wCount = 0;
-  for (LPCSTR* iter = aCmdNames; *iter != NULL; iter++)
+  for (LPCSTR* iter = aszCmdNames; *iter != NULL; iter++)
     {
       ++wCount;
     }
 
-  LPLANGUAGE pRet = (LPLANGUAGE)malloc(sizeof(struct stLanguage));
-  if (pRet == NULL)
+  LPLANGUAGE ret = (LPLANGUAGE)malloc(sizeof(struct stLanguage));
+  if (ret == NULL)
     {
-      ErrPrintf(pError, PL2ERR_MALLOC, SourceInfo(NULL, 0),
+      ErrPrintf(lpError, PL2ERR_MALLOC, SourceInfo(NULL, 0),
                 NULL,
                 "language: ezload: "
                 "cannot allocate memory for pl2w_Language");
       return NULL;
     }
 
-  pRet->szLangName = "unknown";
-  pRet->szLangInfo = "anonymous language loaded by ezload";
-  pRet->pTermCmd = NULL;
-  pRet->pfnInitProc = NULL;
-  pRet->pfnAtexitProc = NULL;
-  pRet->aWCallHandlers = NULL;
-  pRet->pfnFallbackProc = NULL;
-  pRet->aSinvokeHandlers = (SINVHANDLER*)malloc
+  ret->lpszLangName = "unknown";
+  ret->lpszLangInfo = "anonymous language loaded by ezload";
+  ret->lpTermCmd = NULL;
+  ret->lpfnInitProc = NULL;
+  ret->lpfnAtexitProc = NULL;
+  ret->aWCallHandlers = NULL;
+  ret->lpfnFallbackProc = NULL;
+  ret->aSinvokeHandlers = (SINVHANDLER*)malloc
     (
       sizeof(SINVHANDLER) * (wCount + 1)
     );
-  if (pRet->aSinvokeHandlers == NULL)
+  if (ret->aSinvokeHandlers == NULL)
     {
-      ErrPrintf(pError, PL2ERR_MALLOC, SourceInfo(NULL, 0),
+      ErrPrintf(lpError, PL2ERR_MALLOC, SourceInfo(NULL, 0),
                 NULL,
                 "langauge: EasyLoad: "
                 "cannot allocate memory for "
                 "LPLANGUAGE->aSinvokeHandlers");
-      free(pRet);
+      free(ret);
       return NULL;
     }
 
-  memset(pRet->aSinvokeHandlers, 0, (wCount + 1) * sizeof(SINVHANDLER));
+  memset(ret->aSinvokeHandlers, 0, (wCount + 1) * sizeof(SINVHANDLER));
   static CHAR szNameBuffer[512];
   for (WORD i = 0; i < wCount; i++)
     {
-      LPCSTR szCmdName = aCmdNames[i];
-      if (strlen(szCmdName) > 504) {
-        ErrPrintf(pError, PL2ERR_LOAD_LANG, SourceInfo(NULL, 0),
+      LPCSTR lpszCmdName = aszCmdNames[i];
+      if (strlen(lpszCmdName) > 504) {
+        ErrPrintf(lpError, PL2ERR_LOAD_LANG, SourceInfo(NULL, 0),
                   NULL,
                   "language: EasyLoad: "
                   "name over 504 chars not supported");
-        free(pRet->aSinvokeHandlers);
-        free(pRet);
+        free(ret->aSinvokeHandlers);
+        free(ret);
         return NULL;
       }
       strcpy(szNameBuffer, "EL");
-      strncat(szNameBuffer, szCmdName, 504);
+      strncat(szNameBuffer, lpszCmdName, 504);
       void *ptr = GetProcAddress(hModule, szNameBuffer);
       if (ptr == NULL)
         {
-          ErrPrintf(pError, PL2ERR_LOAD_LANG, SourceInfo(NULL, 0),
+          ErrPrintf(lpError, PL2ERR_LOAD_LANG, SourceInfo(NULL, 0),
                     NULL,
                     "language: ezload: cannot load function `%s`: %ld",
                     szNameBuffer, GetLastError());
-          free(pRet->aSinvokeHandlers);
-          free(pRet);
+          free(ret->aSinvokeHandlers);
+          free(ret);
           return NULL;
         }
 
-      pRet->aSinvokeHandlers[i].szCmdName = szCmdName;
-      pRet->aSinvokeHandlers[i].pfnHandlerProc = (LPSINVPROC)ptr;
-      pRet->aSinvokeHandlers[i].bDeprecated = FALSE;
-      pRet->aSinvokeHandlers[i].bRemoved = FALSE;
+      ret->aSinvokeHandlers[i].lpszCmdName = lpszCmdName;
+      ret->aSinvokeHandlers[i].lpfnHandlerProc = (LPSINVPROC)ptr;
+      ret->aSinvokeHandlers[i].bDeprecated = FALSE;
+      ret->aSinvokeHandlers[i].bRemoved = FALSE;
     }
 
-  return pRet;
+  return ret;
 }
